@@ -45,8 +45,6 @@ opencv-contrib-python==4.11.0.86
 opencv-python==4.11.0.86
 opt-einsum==3.3.0
 packaging==26.2
-paddleocr==2.8.1
-paddlepaddle==3.0.0
 pillow==12.3.0
 protobuf==7.35.1
 pyclipper==1.4.0
