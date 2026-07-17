@@ -9,7 +9,6 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from ocr_service import ocr_service
 from openai_service import extract_invoice_data
 
 app = FastAPI(title="Image OCR Demo")

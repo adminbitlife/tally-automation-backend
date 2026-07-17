@@ -162,7 +162,7 @@
       formData.append('purpose', 'ocr');
 
       status.textContent = 'Processing image...';
-      result.textContent = 'Running OCR...';
+      result.textContent = 'Analyzing image...';
 
       try {
         const response = await fetch('/extract-text', {
