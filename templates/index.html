@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Image OCR Uploader</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background: #f4f7fb;
+      color: #1f2937;
+    }
+    .container {
+      max-width: 860px;
+      margin: 40px auto;
+      padding: 24px;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 10px 35px rgba(0,0,0,0.08);
+    }
+    h1 {
+      margin-top: 0;
+    }
+    .drop-area {
+      border: 2px dashed #60a5fa;
+      border-radius: 14px;
+      padding: 32px;
+      text-align: center;
+      background: #eff6ff;
+      cursor: pointer;
+      transition: border-color 0.2s ease, background 0.2s ease;
+    }
+    .drop-area.drag-over {
+      border-color: #2563eb;
+      background: #dbeafe;
+    }
+    .hidden-input {
+      display: none;
+    }
+    .actions {
+      margin-top: 16px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    button {
+      border: none;
+      padding: 10px 16px;
+      border-radius: 10px;
+      background: #2563eb;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #1d4ed8;
+    }
+    .result {
+      margin-top: 24px;
+      padding: 16px;
+      border-radius: 12px;
+      background: #f8fafc;
+      min-height: 120px;
+    }
+    .invoice-card {
+      border: 1px solid #dbeafe;
+      border-radius: 12px;
+      padding: 16px;
+      background: white;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+    }
+    .invoice-line {
+      margin: 8px 0;
+      padding: 6px 0;
+      border-bottom: 1px solid #eef2f7;
+    }
+    .muted {
+      color: #64748b;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Upload an invoice image</h1>
+    <p class="muted">Drag and drop an image into the box below, then submit to extract the text.</p>
+
+    <form id="upload-form">
+      <input class="hidden-input" id="file-input" name="file" type="file" accept="image/*" />
+      <div id="drop-area" class="drop-area">
+        <strong id="drop-label">Drop an image here or click to choose one</strong>
+        <div id="file-name" class="muted">No file selected</div>
+      </div>
+
+      <div class="actions">
+        <button type="submit">Extract text</button>
+        <span id="status" class="muted">Waiting for an image…</span>
+      </div>
+    </form>
+
+    <div id="result" class="result">
+      <div class="invoice-card">
+        <div class="muted">The extracted invoice text will appear here.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const dropArea = document.getElementById('drop-area');
+    const fileInput = document.getElementById('file-input');
+    const fileName = document.getElementById('file-name');
+    const status = document.getElementById('status');
+    const result = document.getElementById('result');
+    const form = document.getElementById('upload-form');
+
+    let selectedFile = null;
+
+    dropArea.addEventListener('click', () => fileInput.click());
+
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropArea.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        dropArea.classList.add('drag-over');
+      });
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropArea.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        dropArea.classList.remove('drag-over');
+      });
+    });
+
+    dropArea.addEventListener('drop', (event) => {
+      const droppedFile = event.dataTransfer?.files?.[0];
+      if (droppedFile) {
+        selectedFile = droppedFile;
+        fileInput.files = event.dataTransfer.files;
+        fileName.textContent = droppedFile.name;
+        status.textContent = 'Image ready to process';
+      }
+    });
+
+    fileInput.addEventListener('change', () => {
+      const file = fileInput.files?.[0];
+      if (file) {
+        selectedFile = file;
+        fileName.textContent = file.name;
+        status.textContent = 'Image ready to process';
+      }
+    });
+
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      if (!selectedFile) {
+        result.textContent = 'Please choose an image first.';
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('purpose', 'ocr');
+
+      status.textContent = 'Processing image...';
+      result.textContent = 'Running OCR...';
+
+      try {
+        const response = await fetch('/extract-text', {
+          method: 'POST',
+          body: formData
+        });
+
+        const payload = await response.json();
+        if (!response.ok) {
+          throw new Error(payload.error || 'OCR failed');
+        }
+
+        const invoiceJson = payload.invoice_json || null;
+        const usage = invoiceJson && invoiceJson.__usage ? invoiceJson.__usage : null;
+
+        if (invoiceJson) {
+          const usageHtml = usage
+            ? `<div class="invoice-card" style="margin-top:12px"><strong>OpenAI usage</strong><pre style="white-space:pre-wrap;font-family:monospace;">${JSON.stringify(usage, null, 2)}</pre></div>`
+            : '';
+          const jsonHtml = `<div class="invoice-card" style="margin-top:12px"><pre style="white-space:pre-wrap;font-family:monospace;">${JSON.stringify(invoiceJson, null, 2)}</pre></div>`;
+          result.innerHTML = `${jsonHtml}${usageHtml}`;
+        } else {
+          result.innerHTML = '<div class="invoice-card"><div class="muted">No result.</div></div>';
+        }
+        status.textContent = 'Done';
+      } catch (error) {
+        result.textContent = error.message || 'Unexpected error';
+        status.textContent = 'Failed';
+      }
+    });
+  </script>
+</body>
+</html>
