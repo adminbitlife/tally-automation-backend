@@ -183,7 +183,44 @@
             ? `<div class="invoice-card" style="margin-top:12px"><strong>OpenAI usage</strong><pre style="white-space:pre-wrap;font-family:monospace;">${JSON.stringify(usage, null, 2)}</pre></div>`
             : '';
           const jsonHtml = `<div class="invoice-card" style="margin-top:12px"><pre style="white-space:pre-wrap;font-family:monospace;">${JSON.stringify(invoiceJson, null, 2)}</pre></div>`;
-          result.innerHTML = `${jsonHtml}${usageHtml}`;
+
+          // Download button for Tally XML
+          const downloadBtn = `<div style="margin-top:12px"><button id="download-xml">Download Tally XML</button></div>`;
+
+          result.innerHTML = `${jsonHtml}${usageHtml}${downloadBtn}`;
+
+          // attach handler
+          document.getElementById('download-xml').addEventListener('click', async () => {
+            try {
+              status.textContent = 'Preparing XML...';
+              const resp = await fetch('/generate-xml', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ invoice_json: invoiceJson, company_name: 'Byto Labs' })
+              });
+              if (!resp.ok) {
+                const err = await resp.json().catch(() => ({}));
+                throw new Error(err.error || 'Failed to generate XML');
+              }
+
+              const blob = await resp.blob();
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              // try to extract filename from Content-Disposition
+              const cd = resp.headers.get('Content-Disposition') || '';
+              const match = cd.match(/filename="?([^";]+)"?/);
+              a.download = match ? match[1] : 'tally_import.xml';
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+              URL.revokeObjectURL(url);
+              status.textContent = 'Done';
+            } catch (err) {
+              status.textContent = 'Failed';
+              alert(err.message || 'Could not download XML');
+            }
+          });
         } else {
           result.innerHTML = '<div class="invoice-card"><div class="muted">No result.</div></div>';
         }
